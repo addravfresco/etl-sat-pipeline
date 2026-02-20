@@ -1,0 +1,16 @@
+# Entornos virtuales
+venv/
+env/
+__pycache__/
+
+# Archivos de logs y auditoría
+*.log
+*.txt
+AUDIT_*.txt
+
+# Archivos de estado y cachés futuros
+*.parquet
+*.json
+
+# Configuraciones locales
+.env
