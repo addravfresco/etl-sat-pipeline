@@ -14,3 +14,7 @@ AUDIT_*.txt
 
 # Configuraciones locales
 .env
+
+# Ignorar archivos temporales de Office
+~$*.xlsx
+~$*.docx

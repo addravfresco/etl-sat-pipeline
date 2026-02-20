@@ -26,7 +26,7 @@ def upload_to_sql_blindado(df: pl.DataFrame, table_name: str, anexo_id: str) -> 
     with engine.begin() as conn:
         conn.execute(text(f"IF OBJECT_ID('{stg_table}', 'U') IS NOT NULL TRUNCATE TABLE {stg_table};"))
 
-    # 2. Volcado Masivo a Staging
+    # 2. Volcado Masivo a Staging (Se lleva la columna FilaOrigen temporalmente)
     df.write_database(
         table_name=stg_table,
         connection=engine,
@@ -36,14 +36,18 @@ def upload_to_sql_blindado(df: pl.DataFrame, table_name: str, anexo_id: str) -> 
 
     # 3. Operación de Upsert con De-duplicación Interna
     with engine.begin() as conn:
-        columnas_lista = ", ".join([f"[{col}]" for col in df.columns])
+        
+        # Filtramos FilaOrigen para NO intentar insertarla en la tabla final
+        cols_destino = [col for col in df.columns if col != "FilaOrigen"]
+        columnas_insert = ", ".join([f"[{col}]" for col in cols_destino])
         
         if anexo_id == "1A":
             # De-duplicación por UUID para Anexo 1A
+            # Ordenamos por FilaOrigen para que, si hay repetidos, siempre elija el primero determinísticamente
             upsert_query = f"""
-                INSERT INTO {table_name} ({columnas_lista})
-                SELECT {columnas_lista} FROM (
-                    SELECT *, ROW_NUMBER() OVER (PARTITION BY [UUID] ORDER BY (SELECT NULL)) as rn
+                INSERT INTO {table_name} ({columnas_insert})
+                SELECT {columnas_insert} FROM (
+                    SELECT *, ROW_NUMBER() OVER (PARTITION BY [UUID] ORDER BY [FilaOrigen] ASC) as rn
                     FROM {stg_table}
                 ) AS Stg
                 WHERE rn = 1
@@ -55,19 +59,20 @@ def upload_to_sql_blindado(df: pl.DataFrame, table_name: str, anexo_id: str) -> 
         
         elif anexo_id == "2B":
             # De-duplicación por HashID calculado para Anexo 2B
+            # INYECCIÓN DEL BOOKMARK: Agregamos [FilaOrigen] al HASHBYTES para asegurar fidelidad del SAT
             upsert_query = f"""
                 WITH CalculoHash AS (
                     SELECT 
-                        CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', CONCAT([UUID], '|', [ConceptoClaveProdServ], '|', [ConceptoImporte])), 2) as NewHash,
-                        {columnas_lista}
+                        CONVERT(VARCHAR(64), HASHBYTES('SHA2_256', CONCAT([UUID], '|', [ConceptoClaveProdServ], '|', [ConceptoImporte], '|', [FilaOrigen])), 2) as NewHash,
+                        *
                     FROM {stg_table}
                 ),
                 Unicos AS (
-                    SELECT *, ROW_NUMBER() OVER (PARTITION BY NewHash ORDER BY (SELECT NULL)) as rn
+                    SELECT *, ROW_NUMBER() OVER (PARTITION BY NewHash ORDER BY [FilaOrigen] ASC) as rn
                     FROM CalculoHash
                 )
-                INSERT INTO {table_name} ([HashID], {columnas_lista})
-                SELECT NewHash, {columnas_lista}
+                INSERT INTO {table_name} ([HashID], {columnas_insert})
+                SELECT NewHash, {columnas_insert}
                 FROM Unicos
                 WHERE rn = 1
                 AND NOT EXISTS (
