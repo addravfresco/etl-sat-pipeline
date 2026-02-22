@@ -37,7 +37,7 @@ BATCH_SIZE = 100_000
 TABLES_CONFIG = {
     "1A": {
         "file_name": "GERG_AECF_1891_Anexo1A-QA.txt",
-        "table_name": "ANEXO_1A_2025_1S",
+        "table_name": "ANEXO_1A_2025_1S_TEST_V2",    #"ANEXO_1A_2025_1S"
         "separator": "|"
     },
     "2B": {

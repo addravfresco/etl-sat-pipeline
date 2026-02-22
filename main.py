@@ -14,12 +14,12 @@ from pkg.transform import transform_sat_batch
 from pkg.enforcer import aplicar_tipos_seguros
 from pkg.load import upload_to_sql_blindado
 from pkg.reports import ETLReport
-from pkg.checkpoint import leer_estado, guardar_estado  # <-- NUEVO MÓDULO IMPORTADO
+from pkg.checkpoint import leer_estado, guardar_estado 
 
 # Configuración del entorno de salida para visualización de logs
 try:
     if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(line_buffering=True)  # type: ignore
+        sys.stdout.reconfigure(line_buffering=True)  
 except AttributeError:
     pass
 
